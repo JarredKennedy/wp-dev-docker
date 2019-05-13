@@ -41,14 +41,21 @@ RUN { \
 		echo 'opcache.enable_cli=1'; \
 	} > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
+RUN echo "file_uploads = On\n" \
+         "memory_limit = 500M\n" \
+         "upload_max_filesize = 500M\n" \
+         "post_max_size = 500M\n" \
+         "max_execution_time = 600\n" \
+         > /usr/local/etc/php/conf.d/uploads.ini
+
 RUN set -ex; \
 	mkdir -p /var/www/html; \
 	chown -R www-data:www-data /var/www/html
 WORKDIR /var/www/html
 VOLUME /var/www/html
 
-ENV WORDPRESS_CLI_VERSION 2.0.1
-ENV WORDPRESS_VERSION 4.9.8
+ENV WORDPRESS_CLI_VERSION 2.2.0
+ENV WORDPRESS_VERSION 5.2
 
 RUN curl -o /usr/local/bin/wp -fSL "https://github.com/wp-cli/wp-cli/releases/download/v${WORDPRESS_CLI_VERSION}/wp-cli-${WORDPRESS_CLI_VERSION}.phar"; \
 	chmod +x /usr/local/bin/wp; \
