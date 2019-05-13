@@ -59,35 +59,35 @@ if [[ "$1" == apache2* ]] || [ "$1" == php-fpm ]; then
 		fi
 	done
 
-	if [ "$haveConfig" ]; then
-		: "${WORDPRESS_DB_HOST:=mysql}"
-		: "${WORDPRESS_DB_USER:=root}"
-		: "${WORDPRESS_DB_PASSWORD:=}"
-		: "${WORDPRESS_DB_NAME:=wordpress}"
-		: "${WORDPRESS_DB_CHARSET:=utf8}"
-		: "${WORDPRESS_DB_COLLATE:=}"
-		: "${WORDPRESS_DEBUG:=}"
+	if ! $(wp core is-installed --allow-root); then
+		if [ "$haveConfig" ]; then
+			: "${WORDPRESS_DB_HOST:=mysql}"
+			: "${WORDPRESS_DB_USER:=root}"
+			: "${WORDPRESS_DB_PASSWORD:=}"
+			: "${WORDPRESS_DB_NAME:=wordpress}"
+			: "${WORDPRESS_DB_CHARSET:=utf8}"
+			: "${WORDPRESS_DB_COLLATE:=}"
+			: "${WORDPRESS_DEBUG:=}"
 
-		wp config create --dbname="$WORDPRESS_DB_NAME" --dbuser="$WORDPRESS_DB_USER" --dbpass="$WORDPRESS_DB_PASSWORD" --dbhost="$WORDPRESS_DB_HOST" --dbcharset="$WORDPRESS_DB_CHARSET" --dbcollate="$WORDPRESS_DB_COLLATE" --allow-root
+			wp config create --force --dbname="$WORDPRESS_DB_NAME" --dbuser="$WORDPRESS_DB_USER" --dbpass="$WORDPRESS_DB_PASSWORD" --dbhost="$WORDPRESS_DB_HOST" --dbcharset="$WORDPRESS_DB_CHARSET" --dbcollate="$WORDPRESS_DB_COLLATE" --allow-root
 
-		for unique in "${uniqueEnvs[@]}"; do
-			uniqVar="WORDPRESS_$unique"
-			if [ -n "${!uniqVar:-}" ]; then
-				wp config set "$unique" "${!uniqVar}" --type=constant --allow-root
-			else
-				currentVal="$(sed -rn -e "s/define\((([\'\"])$unique\2\s*,\s*)(['\"])(.*)\3\);/\4/p" wp-config.php)"
-				if [ "$currentVal" = 'put your unique phrase here' ]; then
-					wp config set "$unique" "$(head -c1m /dev/urandom | sha1sum | cut -d' ' -f1)" --allow-root
+			for unique in "${uniqueEnvs[@]}"; do
+				uniqVar="WORDPRESS_$unique"
+				if [ -n "${!uniqVar:-}" ]; then
+					wp config set "$unique" "${!uniqVar}" --type=constant --allow-root
+				else
+					currentVal="$(sed -rn -e "s/define\((([\'\"])$unique\2\s*,\s*)(['\"])(.*)\3\);/\4/p" wp-config.php)"
+					if [ "$currentVal" = 'put your unique phrase here' ]; then
+						wp config set "$unique" "$(head -c1m /dev/urandom | sha1sum | cut -d' ' -f1)" --allow-root
+					fi
 				fi
-			fi
-		done
+			done
 
-		if [ -n "$WORDPRESS_DEBUG" ]; then
-			wp config set WP_DEBUG true --type=constant --raw --allow-root
+			if [ -n "$WORDPRESS_DEBUG" ]; then
+				wp config set WP_DEBUG true --type=constant --raw --allow-root
+			fi
 		fi
 	fi
-
-	chown -R "$user:$group" .
 
 	: "${WORDPRESS_BLOG_NAME:=WordPress}"
 	: "${WORDPRESS_BLOG_USER:=admin}"
@@ -95,9 +95,11 @@ if [[ "$1" == apache2* ]] || [ "$1" == php-fpm ]; then
 	: "${WORDPRESS_BLOG_EMAIL:=root@localhost}"
 	: "${WORDPRESS_BLOG_URL:=example.com}"
 
-	wp db drop --yes --allow-root || true
-	wp db create --allow-root || true
-	wp core multisite-install --url="$WORDPRESS_BLOG_URL" --title="$WORDPRESS_BLOG_NAME" --admin_user="$WORDPRESS_BLOG_USER" --admin_password="$WORDPRESS_BLOG_PASS" --admin_email="$WORDPRESS_BLOG_EMAIL" --allow-root
+	if wp db create --allow-root ; then
+		wp core multisite-install --url="$WORDPRESS_BLOG_URL" --title="$WORDPRESS_BLOG_NAME" --admin_user="$WORDPRESS_BLOG_USER" --admin_password="$WORDPRESS_BLOG_PASS" --admin_email="$WORDPRESS_BLOG_EMAIL" --allow-root
+	fi
+
+	chown -R "$user:$group" .
 
 	for e in "${envs[@]}"; do
 		unset "$e"
